@@ -8,7 +8,8 @@ ENV CGO_ENABLED=0
 RUN go install -ldflags "-X main.version=v${INFLUX_CLI_VERSION} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     github.com/influxdata/influx-cli/v2/cmd/influx@v${INFLUX_CLI_VERSION}
 
-FROM ubuntu:26.04
+# restic 0.19.x required: restic-exporter 2.x needs total_blob_count in `restic stats --json` ##versions: https://hub.docker.com/r/restic/restic
+FROM restic/restic:0.19.1
 
 ARG TARGETARCH=amd64
 
@@ -38,36 +39,18 @@ ENV RESTIC_RESTORE_OPTIONS=""
 
 WORKDIR /
 
-RUN apt-get update && apt-get install -y \
-    python3-pip \
-    python3.14-venv \
-    wget \
-    curl \
-    bzip2 \
-    mysql-client \
-    tini \
-    cron \
-    && rm -rf /var/lib/apt/lists/*
-
-# ##versions: https://github.com/restic/restic/releases
-# restic 0.19.x required: restic-exporter 2.x needs total_blob_count in `restic stats --json`
-ARG RESTIC_VERSION=0.19.1
-RUN set -e; \
-    cd /tmp; \
-    wget -qO restic.bz2 "https://github.com/restic/restic/releases/download/v${RESTIC_VERSION}/restic_${RESTIC_VERSION}_linux_${TARGETARCH}.bz2"; \
-    bunzip2 -c restic.bz2 > /usr/local/bin/restic; \
-    chmod +x /usr/local/bin/restic; \
-    rm -f restic.bz2
+# crond/crontab come from busybox in the base image
+RUN apk add --no-cache py3-pip curl mysql-client mariadb-connector-c tini
 
 # ##versions: https://github.com/ngosang/restic-exporter/releases
 ARG RESTIC_EXPORTER_VERSION=2.1.2
 RUN set -e; \
   mkdir /exporter; \
   cd /exporter; \
-  python3 -m venv ./venv; \
-  . ./venv/bin/activate; \
+  # venv without pip (pip is only needed at build time, ~13 MB smaller image)
+  python3 -m venv --without-pip ./venv; \
   # dependency pinned in upstream pyproject.toml (v2.x has no requirements.txt) ##versions https://github.com/ngosang/restic-exporter/blob/2.1.2/pyproject.toml
-  pip3 install prometheus-client==0.25.0; \
+  python3 -m pip --python /exporter/venv/bin/python install --no-cache-dir prometheus-client==0.25.0; \
   wget -q https://raw.githubusercontent.com/ngosang/restic-exporter/${RESTIC_EXPORTER_VERSION}/exporter/exporter.py; \
   # local patch: restic omits total_blob_count/total_file_count from stats JSON when they are 0 (omitempty),
   # exporter crashes with KeyError on empty repositories until first snapshot exists
@@ -85,4 +68,4 @@ COPY --from=influx-cli /go/bin/influx /usr/local/bin/influx
 
 ADD scripts/* /
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/entry.sh"]
+ENTRYPOINT ["/sbin/tini", "--", "/entry.sh"]

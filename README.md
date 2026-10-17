@@ -9,12 +9,11 @@
 
 ## Image contents
 
-Based on `ubuntu:26.04` (multi-arch: amd64/arm64):
+Based on `restic/restic` (alpine, multi-arch: amd64/arm64) — restic comes from the base image:
 
-- restic (official binary, see `RESTIC_VERSION` in Dockerfile)
 - restic-exporter (Prometheus metrics, see `RESTIC_EXPORTER_VERSION` in Dockerfile)
 - InfluxDB v2 CLI (built from the official `influx-cli` module, see `INFLUX_CLI_VERSION` in Dockerfile)
-- kubectl, mysql-client, cron, tini
+- kubectl, mysql-client, crond (busybox), tini
 
 ## Behavior
 
@@ -49,7 +48,7 @@ Occasionally check container logs to see backup results.
 | `RESTIC_FORGET_ARGS` | `--keep-last 7` | Arguments for `restic forget`; set to `""` to never run forget |
 | `RESTIC_BACKUP_OPTIONS` | `""` | Extra arguments for `restic backup` |
 | `RESTIC_RESTORE_OPTIONS` | `""` | Extra arguments for `restic restore` |
-| `RESTIC_HOST` | `$HOSTNAME` | Host name used for `--host` in backup/restore/snapshots (identifies the source host in the repository) |
+| `RESTIC_HOST` | `localhost` | Host name used for `--host` in backup/restore/snapshots (identifies the source host in the repository). Defaults to the stable name `localhost` so all pods of a workload share one snapshot line — set it explicitly (e.g. per PVC) when multiple sources share a repository |
 | `RESTIC_RESTORE` | `0` | `1`: restore on startup (see behavior above) |
 | `RESTIC_RESTORE_SNAPSHOT` | `latest` | Snapshot to restore |
 | `RESTIC_INSTANT_BACKUP` | `0` | `1`: run a single backup on startup and exit (no cron) |
@@ -65,6 +64,25 @@ Occasionally check container logs to see backup results.
 | `LISTEN_ADDRESS` | `0.0.0.0` | Metrics exporter bind address |
 
 Note: ionice/nice are applied to `restic backup`, `restic forget` and `restic check`.
+
+## Ad-hoc operations (kubectl exec)
+
+The scripts in `/` can be executed directly in a running container for ad-hoc backups, snapshot listings and restores:
+
+```bash
+kubectl exec -it <pod> -- ./backup.sh                      # one-off backup (incl. forget + marker file)
+kubectl exec -it <pod> -- ./snapshots.sh                   # list snapshots of this host
+kubectl exec -it <pod> -- ./restore.sh latest --target /
+kubectl exec -it <pod> -- ./restore.sh 062d760a --target / --include 'config/*'
+```
+
+- Environment: `kubectl exec` inherits the container environment (`RESTIC_PASSWORD`, `RESTIC_REPOSITORY`, ...). `RESTIC_HOST` falls back to `localhost`, the same host name the cron backups use, so ad-hoc commands stay on the same snapshot line
+- `restore.sh` passes all arguments verbatim to `restic restore` (snapshot id, `--target`, `--include`, `--exclude`, ...); without a snapshot id, `restic restore` defaults to the latest snapshot
+- Notes:
+    - `restore.sh` writes the marker file `restic-restored.txt` — the automatic restore on the next container start is then skipped
+    - `restore.sh` sets the `restic-restore-inprogress.txt` marker while running; concurrent backup/restore processes wait for it to disappear
+    - restic repository lock: an ad-hoc command running at the same time as a cron backup/check may report `repo already locked` — just retry
+    - the scripts assume CWD `/` (they source `./init.inc.sh`), which is the image WORKDIR and the default for `kubectl exec`
 
 ## Prometheus metrics
 

@@ -13,7 +13,7 @@ fi
 
 echo "Starting... image version ${IMAGE_VERSION}"
 
-export RESTIC_HOST=${RESTIC_HOST:-${HOSTNAME}}
+export RESTIC_HOST=${RESTIC_HOST:-localhost}
 
 echo "unlock at startup"
 restic unlock
@@ -56,15 +56,19 @@ else
   else
     echo "Continues backup is requested -> configure cron and keep running."
 
-    mkdir -p /var/spool/cron/crontabs
-    echo "${BACKUP_CRON} cd / && ./backup.sh >> /var/log/cron.log 2>&1" > /var/spool/cron/crontabs/root
-    echo "${CHECK_CRON} cd / && ./check.sh >> /var/log/cron.log 2>&1" >> /var/spool/cron/crontabs/root
-
     # ensure file exists, default CMD is to tail this file
     touch /var/log/cron.log
 
+    # install crontab via `crontab` (sets correct 0600 perms, cron refuses files
+    # written directly with e.g. `echo > /var/spool/cron/crontabs/root`);
+    # busybox crond passes the daemon's environment down to the jobs
+    {
+      echo "${BACKUP_CRON} cd / && ./backup.sh >> /var/log/cron.log 2>&1"
+      echo "${CHECK_CRON} cd / && ./check.sh >> /var/log/cron.log 2>&1"
+    } | crontab -
+
     # start cron daemon
-    cron
+    crond
     tail -fn0 /var/log/cron.log &
 
     echo "Starting metrics exporter..."

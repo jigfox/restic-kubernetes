@@ -1,5 +1,5 @@
 
-export RESTIC_HOST=${RESTIC_HOST:-${HOSTNAME}}
+export RESTIC_HOST=${RESTIC_HOST:-localhost}
 
 RESTORED_MARKER_FILE=${RESTIC_DATA_DIR}${RESTIC_MARKER_FILE_SUBDIR}restic-restored.txt
 RESTORE_IN_PROGRESS_MARKER_FILENAME=restic-restore-inprogress.txt
@@ -69,10 +69,12 @@ runScripts() {
       # Change to the directory
       cd "${DIR}"
 
-      # Loop over each script in the directory
+      # Loop over each script in the directory (the glob stays literal when the
+      # directory is empty, so guard with a file test)
       for FILE in *.sh
       do
-          echo "Running ${FILE}"    
+          [ -f ${FILE} ] || continue
+          echo "Running ${FILE}"
           sh ./"${FILE}"
       done
   fi
