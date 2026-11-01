@@ -20,9 +20,9 @@ Based on `restic/restic` (alpine, multi-arch: amd64/arm64) — restic comes from
 On startup the container:
 
 1. Runs `restic unlock`
-2. Checks the repository at `RESTIC_REPOSITORY` and initializes it (`restic init`) if it does not exist or is malformed
+2. Checks the repository at `RESTIC_REPOSITORY` and initializes it (`restic init`) if it does not exist (restic exit code 10). Any other error (network, credentials, lock) exits non-zero, so a temporarily unreachable repository is never mistaken for a new one
 3. Then, depending on configuration:
-    - `RESTIC_RESTORE=1`: restores `RESTIC_RESTORE_SNAPSHOT` (default `latest`) into `/`, unless the marker file `${RESTIC_DATA_DIR}/restic-restored.txt` already exists (restore already happened). If the repository is missing, the marker is written instead and the container exits (fresh start, nothing to restore)
+    - `RESTIC_RESTORE=1`: restores `RESTIC_RESTORE_SNAPSHOT` (default `latest`) into `/`, unless the marker file `${RESTIC_DATA_DIR}/restic-restored.txt` already exists (restore already happened). If the repository is missing, or has no snapshot for `RESTIC_HOST`, the marker is written instead and the container exits (fresh start, nothing to restore). A failed restore exits non-zero without writing the marker, so the initContainer is retried instead of the app starting on partial data
     - `RESTIC_INSTANT_BACKUP=1`: runs a single backup and exits
     - default: starts the cron daemon with `BACKUP_CRON`/`CHECK_CRON`, tails `/var/log/cron.log` (default CMD), and starts the metrics exporter
 

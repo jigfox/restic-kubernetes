@@ -24,13 +24,20 @@ repo_status=$?
 
 echo $repo_status
 
+# only exit code 10 means the repository does not exist yet; anything else
+# (network, credentials, lock) must not be mistaken for a new repository
+if [ $repo_status != 0 ] && [ $repo_status != 10 ]; then
+  echo "Repository '${RESTIC_REPOSITORY}' is not accessible (status $repo_status)."
+  exit 1
+fi
+
 if [ $repo_status != 0 ] && [ "${RESTIC_RESTORE}" = "1" ]; then
   echo "Restore is requested but the repository '${RESTIC_REPOSITORY}' does not exists, assuming starting from scratch -> skip restore."
   markRestored
   exit 0
 fi
 
-# initialize repo if it doesn't exist or is malformed
+# initialize repo if it doesn't exist
 if [ $repo_status != 0 ]; then
   echo "Initializing restic repository at '${RESTIC_REPOSITORY}'..."
   restic init
