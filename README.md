@@ -13,7 +13,7 @@ Based on `restic/restic` (alpine, multi-arch: amd64/arm64) — restic comes from
 
 - restic-exporter (Prometheus metrics, see `RESTIC_EXPORTER_VERSION` in Dockerfile)
 - InfluxDB v2 CLI (built from the official `influx-cli` module, see `INFLUX_CLI_VERSION` in Dockerfile)
-- kubectl, mysql-client, crond (busybox), tini
+- kubectl, mysql-client, supercronic, tini
 
 ## Behavior
 
@@ -24,7 +24,7 @@ On startup the container:
 3. Then, depending on configuration:
     - `RESTIC_RESTORE=1`: restores `RESTIC_RESTORE_SNAPSHOT` (default `latest`) into `/`, unless the marker file `${RESTIC_DATA_DIR}/restic-restored.txt` already exists (restore already happened). If the repository is missing, or has no snapshot for `RESTIC_HOST`, the marker is written instead and the container exits (fresh start, nothing to restore). A failed restore exits non-zero without writing the marker, so the initContainer is retried instead of the app starting on partial data
     - `RESTIC_INSTANT_BACKUP=1`: runs a single backup and exits
-    - default: starts the cron daemon with `BACKUP_CRON`/`CHECK_CRON`, tails `/var/log/cron.log` (default CMD), and starts the metrics exporter
+    - default: starts supercronic with `BACKUP_CRON`/`CHECK_CRON` (job output goes to the container log) and starts the metrics exporter
 
 Additional behavior:
 
@@ -35,6 +35,8 @@ Additional behavior:
     - `restic-restore-inprogress.txt` — written while a restore runs; concurrent backup/restore processes wait for it to disappear
 
 Occasionally check container logs to see backup results.
+
+The image runs as root by default but works as any user (e.g. `securityContext.runAsUser` matching the app's files): cron, the crontab and the restic cache only use `/tmp`.
 
 ## Environment variables
 
@@ -56,6 +58,8 @@ Occasionally check container logs to see backup results.
 | `RESTIC_DATA_DIR` | `/data` | Where marker files are stored |
 | `RESTIC_MARKER_FILE_SUBDIR` | `/` | Subdirectory for marker files within `RESTIC_DATA_DIR` |
 | `RESTIC_SCRIPTS_DIR` | `/restic-scripts` | Directory containing hook script subdirectories |
+| `RESTIC_CACHE_DIR` | `/tmp/restic-cache` | restic cache directory (writable for any user) |
+| `CRONTAB_FILE` | `/tmp/crontab` | Where the generated crontab is written |
 | `REFRESH_INTERVAL` | `600` | Metrics exporter refresh interval in seconds |
 | `NICE_ADJUST` | `10` | Nice priority adjustment for backup/check runs |
 | `IONICE_CLASS` | `2` | ionice scheduling class (best-effort) |

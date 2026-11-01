@@ -36,11 +36,14 @@ ENV RESTIC_SCRIPTS_DIR="/restic-scripts"
 ENV RESTIC_MARKER_FILE_SUBDIR="/"
 ENV RESTIC_BACKUP_OPTIONS=""
 ENV RESTIC_RESTORE_OPTIONS=""
+# writable for any user, so the image also runs as non-root
+ENV RESTIC_CACHE_DIR="/tmp/restic-cache"
+ENV CRONTAB_FILE="/tmp/crontab"
 
 WORKDIR /
 
-# crond/crontab come from busybox in the base image
-RUN apk add --no-cache py3-pip curl mysql-client mariadb-connector-c tini
+# supercronic instead of busybox crond: it runs as any user (crond needs root)
+RUN apk add --no-cache py3-pip curl mysql-client mariadb-connector-c tini supercronic
 
 # ##versions: https://github.com/ngosang/restic-exporter/releases
 ARG RESTIC_EXPORTER_VERSION=2.1.2

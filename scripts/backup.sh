@@ -38,7 +38,10 @@ if [ -n "${RESTIC_FORGET_ARGS}" ]; then
     fi
 fi
 
-markRestored
+# a volume that has been backed up counts as restored; only create the
+# marker, never rewrite it, so a non-root sidecar needs no write access to a
+# marker another user has written
+[ -f "${RESTORED_MARKER_FILE}" ] || markRestored
 
 end=`date +%s`
 echo "Finished backup at $(date +"%Y-%m-%d %H:%M:%S") after $((end-start)) seconds"
