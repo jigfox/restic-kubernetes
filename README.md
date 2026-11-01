@@ -24,7 +24,7 @@ On startup the container:
 3. Then, depending on configuration:
     - `RESTIC_RESTORE=1`: restores `RESTIC_RESTORE_SNAPSHOT` (default `latest`) into `/`, unless the marker file `${RESTIC_DATA_DIR}/restic-restored.txt` already exists (restore already happened). If the repository is missing, or has no snapshot for `RESTIC_HOST`, the marker is written instead and the container exits (fresh start, nothing to restore). A failed restore exits non-zero without writing the marker, so the initContainer is retried instead of the app starting on partial data
     - `RESTIC_INSTANT_BACKUP=1`: runs a single backup and exits
-    - default: starts supercronic with `BACKUP_CRON`/`CHECK_CRON` (job output goes to the container log) and starts the metrics exporter
+    - default: starts supercronic with `BACKUP_CRON`/`CHECK_CRON` (job output goes to the container log) and starts the metrics exporter (unless `RESTIC_EXPORTER_ENABLED=0`)
 
 Additional behavior:
 
@@ -60,6 +60,7 @@ The image runs as root by default but works as any user (e.g. `securityContext.r
 | `RESTIC_SCRIPTS_DIR` | `/restic-scripts` | Directory containing hook script subdirectories |
 | `RESTIC_CACHE_DIR` | `/tmp/restic-cache` | restic cache directory (writable for any user) |
 | `CRONTAB_FILE` | `/tmp/crontab` | Where the generated crontab is written |
+| `RESTIC_EXPORTER_ENABLED` | `1` | `0`: don't start the metrics exporter (e.g. when one central exporter watches a shared repository) |
 | `REFRESH_INTERVAL` | `600` | Metrics exporter refresh interval in seconds |
 | `NICE_ADJUST` | `10` | Nice priority adjustment for backup/check runs |
 | `IONICE_CLASS` | `2` | ionice scheduling class (best-effort) |

@@ -74,8 +74,10 @@ else
     } > ${CRONTAB_FILE}
     supercronic -passthrough-logs ${CRONTAB_FILE} &
 
-    echo "Starting metrics exporter..."
-    ./exporter.sh &
+    if [ "${RESTIC_EXPORTER_ENABLED}" = "1" ]; then
+      echo "Starting metrics exporter..."
+      ./exporter.sh &
+    fi
 
     echo "Container setup complete."
     wait
