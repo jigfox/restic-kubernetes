@@ -11,7 +11,9 @@ RUN go install -ldflags "-X main.version=v${INFLUX_CLI_VERSION} -X main.date=$(d
 # restic 0.19.x required: restic-exporter 2.x needs total_blob_count in `restic stats --json` ##versions: https://hub.docker.com/r/restic/restic
 FROM restic/restic:0.19.1
 
-ARG TARGETARCH=amd64
+# set by buildx per platform; a default here would override it and put an
+# amd64 kubectl into the arm64 image
+ARG TARGETARCH
 
 ARG IMAGE_VERSION=latest
 
